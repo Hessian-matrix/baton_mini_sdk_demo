@@ -1,0 +1,5 @@
+<launch>
+    <node name="baton_mini" pkg="baton_mini" type="baton_mini" output="screen">
+
+    </node>
+</launch>
