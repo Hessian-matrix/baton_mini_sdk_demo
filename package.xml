@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package>
+  <name>baton_mini</name>
+  <version>0.0.0</version>
+  <description>The baton_mini package</description>
+
+  <maintainer email="tl@gmail.com">tl</maintainer>
+
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <run_depend>roscpp</run_depend>
+
+  <export>
+ </export>
+</package>

@@ -1,0 +1,270 @@
+#include <mutex>
+#include <thread>
+#include <iostream>
+#include <ros/ros.h>
+#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/Image.h>
+#include <nav_msgs/Odometry.h>
+#include <cv_bridge/cv_bridge.h>
+#include <tbb/concurrent_queue.h>
+
+#include "sdk/imu.hpp"
+#include "sdk/image.hpp"
+#include "baton_mini.h"
+
+using namespace std;
+
+ros::Publisher pub_imu;
+ros::Publisher pub_odometry;
+ros::Publisher pub_image_left;
+ros::Publisher pub_image_right;
+ros::Publisher pub_image_feature;
+
+HANDLE loginHandle; 
+system_status sys_status = ready;//define the status of system
+imu_switch imu_status = OFF;
+
+void vio_call connect_callback(int state, void* userData){
+    if (state == 1)
+        printf("connect ok !\n");
+    else if (state == 0)
+        printf("disconnected !\n");
+    else if(state == -1)
+        printf("connect error !\n");
+    else if (state == -2)
+        printf("keepalive thread exit !\n");
+    else
+        printf("unknown !\n");
+}
+
+void vio_call event_callback(const char* data, int length, void* userData){
+    printf("event_callback:%s\n",data);
+}
+
+vio_login_info_s login_info = {
+    "192.168.1.10",
+    8000,
+    "",
+    "",
+    NULL,
+    connect_callback,
+    event_callback
+};
+
+//发布里程计话题
+void publish_odom(const odom_t& odom){
+    ros::Time stamp = ros::Time::now(); 
+    nav_msgs::Odometry odom_msg;
+    odom_msg.header.stamp = stamp;
+    odom_msg.header.frame_id = "odom";
+    odom_msg.pose.pose.position.x = odom.pose.px;
+    odom_msg.pose.pose.position.y = odom.pose.py;
+    odom_msg.pose.pose.position.z = odom.pose.pz;
+    odom_msg.pose.pose.orientation.x = odom.pose.qx;
+    odom_msg.pose.pose.orientation.y = odom.pose.qy;
+    odom_msg.pose.pose.orientation.z = odom.pose.qz;
+    odom_msg.pose.pose.orientation.w = odom.pose.qw;
+    odom_msg.twist.twist.linear.x = odom.speed.lx;
+    odom_msg.twist.twist.linear.y = odom.speed.ly;
+    odom_msg.twist.twist.linear.z = odom.speed.lz;
+    odom_msg.twist.twist.angular.x = odom.speed.ax;
+    odom_msg.twist.twist.angular.y = odom.speed.ay;
+    odom_msg.twist.twist.angular.z = odom.speed.az;
+    pub_odometry.publish(odom_msg);
+}
+
+void odom_data_print(int length, const char* frameData) {
+    // printf("odom_data:\n");
+	odom_t odom;
+	memcpy(&odom.pose,frameData,sizeof(odom.pose));
+	// std::cout << "\t Position:" << odom.pose.px << "," << odom.pose.py << "," << odom.pose.pz << "\n";
+	// std::cout << "\t Quaternion:" << odom.pose.qx << "," << odom.pose.qy << "," << odom.pose.qz << "," << odom.pose.qw << "\n";
+	memcpy(&odom.speed,frameData + sizeof(odom.pose),sizeof(odom.speed));
+	// std::cout << "\t twist:" << odom.speed.lx << "," << odom.speed.ly << "," << odom.speed.lz 
+	//           << "," << odom.speed.ax << "," << odom.speed.ay << "," << odom.speed.az << "\n";
+	publish_odom(odom);
+}
+
+void vio_call stream_callback(int channel, const vio_frame_info_s* frameInfo, const char* frameData, void* userData){
+    if (frameInfo->type == vio_frame_pose_and_twist) {
+        odom_data_print(frameInfo->length,frameData);
+    }
+    else if (frameInfo->type == vio_frame_sys_state) {//get the status of system
+        sys_status = static_cast<system_status>(frameData[frameInfo->length - 1]);
+        printf("sys_status:%d\n", frameData[frameInfo->length - 1]);
+    }
+    else
+        return;
+    // printf("==================\n");
+}
+
+int baton_open_imu_recv(HANDLE loginHandle,imu_switch sw){
+    std::string body = "";
+	cJSON* obj = cJSON_CreateObject();
+	if (obj) {
+		cJSON_AddNumberToObject(obj, "imu_enable", (int)sw);
+		char* out = cJSON_PrintUnformatted(obj);
+		body.append(out);
+		free(out);
+		cJSON_Delete(obj);
+	}
+	if (body.empty())
+		return -1;
+	net_vio_set_cfg(loginHandle,ctrl_smart_status,body.c_str(),body.length());
+    return 0;
+}
+
+int baton_open_image_recv(HANDLE loginHandle,image_get image_type_get){
+    std::string body = "";
+	cJSON* obj = cJSON_CreateObject();
+	if (obj) {
+		cJSON_AddNumberToObject(obj, "gray_image_enable", (int)image_type_get);
+		char* out = cJSON_PrintUnformatted(obj);
+		body.append(out);
+		free(out);
+		cJSON_Delete(obj);
+	}
+	if (body.empty())
+		return -1;
+	net_vio_set_cfg(loginHandle,ctrl_smart_status,body.c_str(),body.length());
+    return 0;
+}
+
+//发布imu数据话题
+void publish_imu(const imu_data& imu){
+    ros::Time stamp = ros::Time::now(); 
+    sensor_msgs::Imu imu_msg;
+    imu_msg.header.stamp = stamp;
+    imu_msg.header.frame_id = "imu";
+    imu_msg.linear_acceleration.x = imu.acc_x;
+    imu_msg.linear_acceleration.y = imu.acc_y;
+    imu_msg.linear_acceleration.z = imu.acc_z;
+    imu_msg.angular_velocity.x = imu.gyro_x;
+    imu_msg.angular_velocity.y = imu.gyro_y;
+    imu_msg.angular_velocity.z = imu.gyro_z;
+    pub_imu.publish(imu_msg);
+}
+
+//发布image_left数据话题
+void publish_image_left(const cv::Mat& image_){
+    ros::Time stamp = ros::Time::now(); 
+    cv_bridge::CvImage out_msg;
+    out_msg.header.stamp = stamp;
+    out_msg.header.frame_id = "cam_left";
+    out_msg.encoding = sensor_msgs::image_encodings::MONO8;
+    out_msg.image = image_;
+    pub_image_left.publish(out_msg.toImageMsg());
+}
+
+//发布image_right数据话题
+void publish_image_right(const cv::Mat& image_){
+    ros::Time stamp = ros::Time::now(); 
+    cv_bridge::CvImage out_msg;
+    out_msg.header.stamp = stamp;
+    out_msg.header.frame_id = "cam_right";
+    out_msg.encoding = sensor_msgs::image_encodings::MONO8;
+    out_msg.image = image_;
+    pub_image_right.publish(out_msg.toImageMsg());
+}
+
+//发布image_right数据话题
+void publish_image_feature(const cv::Mat& image_){
+    ros::Time stamp = ros::Time::now(); 
+    cv_bridge::CvImage out_msg;
+    out_msg.header.stamp = stamp;
+    out_msg.header.frame_id = "feature_img";
+    out_msg.encoding = sensor_msgs::image_encodings::RGB8;
+    out_msg.image = image_;
+    pub_image_feature.publish(out_msg.toImageMsg());
+}
+
+void command_thread(){
+    HANDLE streamHandle1 = NULL;
+    printf("sdk version : 0x%08lx\n", net_vio_sdk_version());
+    net_vio_sdk_init();
+
+    // cout << "Please input device ip : ";
+    // cin >> login_info.ipaddr;
+
+    loginHandle = net_vio_login(login_info);
+    if (!loginHandle){
+        cout << "login fail\n";
+        net_vio_sdk_exit();
+        cout << "ByeBye\n";
+        return ;
+    }
+    std::cout << "login success\n";
+    cout << "Please input the operation[0-3] : ";   
+
+    int v;
+    image_get image_get_status;
+    while (cin >> v){
+        if (v == 0) {
+            net_vio_logout(loginHandle);
+            break;
+        }
+        else if (v == 1) {
+            if (streamHandle1 == NULL) {//Establish a connection for flow channel 1
+                streamHandle1 = net_vio_stream_connect(loginHandle, 1, stream_callback);
+            }
+            else {//disconnect
+                net_vio_stream_disconnect(streamHandle1);
+                streamHandle1 = NULL;
+            }
+        }
+        else if (v == 2){//start or stop
+            char buffer[] = "{}";
+            if (sys_status == ready) {//The system is currently in a ready state and can be started directly
+                net_vio_set_cfg(loginHandle, algorithm_enable, buffer, strlen(buffer));
+            }
+            else if (sys_status == stereo3_running) {//The system is currently in a running state and can be stoped
+                net_vio_set_cfg(loginHandle, algorithm_disable, buffer, strlen(buffer));
+            }
+        }
+        else if (v == 3) {//algo restart
+            char buffer[]="{}";
+            if (sys_status == stereo3_running) {//The stereo2 algorithm is currently in a running state and can be restart
+                net_vio_set_cfg(loginHandle, algorithm_reboot, buffer, strlen(buffer));
+            }
+        }
+		else if(v == 4){
+            if(imu_status == ON){
+                imu_status = OFF;
+			    baton_open_imu_recv(loginHandle,imu_status);
+            }
+            else{
+                imu_status = ON;
+                baton_open_imu_recv(loginHandle,imu_status);
+            }
+		}
+        else if(v == 5){
+            baton_open_image_recv(loginHandle,stereo);
+        }
+    }
+    net_vio_sdk_exit();
+    cout << "ByeBye\n";
+}
+
+int main(int argc, char** argv){
+	ros::init(argc, argv, "baton_mini");
+    ros::NodeHandle nh;
+	pub_imu = nh.advertise<sensor_msgs::Imu>("baton_mini/imu", 50);
+	pub_odometry = nh.advertise<nav_msgs::Odometry>("baton_mini/odometry", 10);
+	pub_image_left = nh.advertise<sensor_msgs::Image>("baton_mini/image_left", 5);
+	pub_image_right = nh.advertise<sensor_msgs::Image>("baton_mini/image_right", 5);
+    pub_image_feature = nh.advertise<sensor_msgs::Image>("baton_mini/image_feature", 5);
+
+	IMU imu_recv(&publish_imu);
+    image image_left_recv(&publish_image_left,left_img);
+    image image_right_recv(&publish_image_right,right_img);
+    image image_feature_recv(&publish_image_feature,feature_img);
+    
+    std::thread http_command{command_thread};
+
+    ros::MultiThreadedSpinner spinner(3);
+	spinner.spin();
+    http_command.join();
+    ros::shutdown();
+    return 0;
+}
+
