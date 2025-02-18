@@ -66,6 +66,11 @@ void vio_call stream_callback(int channel, const vio_frame_info_s* frameInfo, co
     }
     else if (frameInfo->type == vio_frame_sys_state) {//get the status of system
         sys_status = static_cast<system_status>(frameData[frameInfo->length - 1]);
+        if(sys_status == ready){
+            printf("system is ready!\n");
+        }else if(sys_status == stereo3_running){
+            printf("stereo3 algorithm is running!\n");
+        }
         // printf("sys_status:%d\n", frameData[frameInfo->length - 1]);
     }
 }
