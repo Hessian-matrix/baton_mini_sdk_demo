@@ -66,11 +66,11 @@ void vio_call stream_callback(int channel, const vio_frame_info_s* frameInfo, co
     }
     else if (frameInfo->type == vio_frame_sys_state) {//get the status of system
         sys_status = static_cast<system_status>(frameData[frameInfo->length - 1]);
-        if(sys_status == ready){
-            printf("system is ready!\n");
-        }else if(sys_status == stereo3_running){
-            printf("stereo3 algorithm is running!\n");
-        }
+        // if(sys_status == ready){
+        //     printf("system is ready!\n");
+        // }else if(sys_status == stereo3_running){
+        //     printf("stereo3 algorithm is running!\n");
+        // }
         // printf("sys_status:%d\n", frameData[frameInfo->length - 1]);
     }
 }
@@ -155,8 +155,8 @@ int main(int argc, char** argv){
 
     std::thread http_command{command_thread};
     IMU imu_recv(&publish_imu);
-    Image image_left_recv(&publish_image_left);//left default
-    Image image_right_recv(&publish_image_right,false);//right must set false
+    Image_tcp image_left_recv(&publish_image_left);//left default
+    Image_tcp image_right_recv(&publish_image_right,false);//right must set false
 
     ros::MultiThreadedSpinner spinner(3);
 	spinner.spin();
