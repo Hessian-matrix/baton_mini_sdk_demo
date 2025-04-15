@@ -1,9 +1,13 @@
 #include "baton_ros.h"
+#include <mutex>
 
 ros::Publisher pub_imu;
 ros::Publisher pub_odometry;
 ros::Publisher pub_image_left;
 ros::Publisher pub_image_right;
+ros::Time sim_stamp;
+bool sim_stamp_left_flag = false,sim_stamp_right_flag = false;
+std::mutex sim_stamp_mutex;
 
 void baton_ros_init(ros::NodeHandle nh, std::string &server_ip,std::string &local_ip){
     nh.param<std::string>("server_ip", server_ip, "192.168.1.10");
@@ -38,7 +42,14 @@ void publish_odom(const odom_t& odom){
 
 //publish imu data message
 void publish_imu(const imu_data& imu){
-    ros::Time stamp = ros::Time::now(); 
+    ros::Time stamp = ros::Time::now();
+    if(imu.keyframe){
+        sim_stamp_mutex.lock();
+        sim_stamp_left_flag = true;
+        sim_stamp_right_flag = true;
+        sim_stamp = stamp;
+        sim_stamp_mutex.unlock();
+    }
     sensor_msgs::Imu imu_msg;
     imu_msg.header.stamp = stamp;
     imu_msg.header.frame_id = "imu";
@@ -53,9 +64,18 @@ void publish_imu(const imu_data& imu){
 
 //publish left image data message 
 void publish_image_left(const cv::Mat& image_){
-    ros::Time stamp = ros::Time::now(); 
     cv_bridge::CvImage out_msg;
-    out_msg.header.stamp = stamp;
+    ros::Time stamp;
+    sim_stamp_mutex.lock();
+    if(!sim_stamp_left_flag){
+        stamp = ros::Time::now();
+        out_msg.header.stamp = stamp;
+    }
+    else{
+        out_msg.header.stamp = sim_stamp;
+        sim_stamp_left_flag = false;
+    }
+    sim_stamp_mutex.unlock();
     out_msg.header.frame_id = "cam_left";
     out_msg.encoding = sensor_msgs::image_encodings::MONO8;
     out_msg.image = image_;
@@ -64,9 +84,18 @@ void publish_image_left(const cv::Mat& image_){
 
 //publish right image data message 
 void publish_image_right(const cv::Mat& image_){
-    ros::Time stamp = ros::Time::now(); 
     cv_bridge::CvImage out_msg;
-    out_msg.header.stamp = stamp;
+    ros::Time stamp;
+    sim_stamp_mutex.lock();
+    if(!sim_stamp_right_flag){
+        stamp = ros::Time::now();
+        out_msg.header.stamp = stamp;
+    }
+    else{
+        out_msg.header.stamp = sim_stamp;
+        sim_stamp_right_flag = false;
+    }
+    sim_stamp_mutex.unlock();
     out_msg.header.frame_id = "cam_right";
     out_msg.encoding = sensor_msgs::image_encodings::MONO8;
     out_msg.image = image_;
