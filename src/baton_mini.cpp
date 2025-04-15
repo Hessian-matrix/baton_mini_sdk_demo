@@ -164,8 +164,8 @@ int main(int argc, char** argv){
     #else
     std::thread http_command{command_thread};
     IMU imu_recv(&imu_data_recv);
-    Image image_left_recv(&image_left_data);//left default
-    Image image_right_recv(&image_right_data,false);//right must set false
+    Image_tcp image_left_recv(&image_left_data);//left default
+    Image_tcp image_right_recv(&image_right_data,false);//right must set false
     #endif
     http_command.join();
     return 0;
