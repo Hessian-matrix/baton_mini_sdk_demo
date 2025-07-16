@@ -10,11 +10,11 @@ HANDLE loginHandle; //SDK connect handle,need initialize to login
 /*
 open imu receive
 param:
-    imu_switch : 
+    recv_switch : 
     OFF = 0, close imu receive
     ON = 1, open imu receive
 */
-int baton_open_imu_recv(imu_switch sw){
+int baton_open_imu_recv(recv_switch sw){
     if(sw == ON)
         std::cout << "imu receive open" << std::endl;
     else
@@ -24,6 +24,34 @@ int baton_open_imu_recv(imu_switch sw){
 	cJSON* obj = cJSON_CreateObject();
 	if (obj) {
 		cJSON_AddNumberToObject(obj, "imu_enable", (int)sw);
+		char* out = cJSON_PrintUnformatted(obj);
+		body.append(out);
+		free(out);
+		cJSON_Delete(obj);
+	}
+	if (body.empty())
+		return -1;
+	net_vio_set_cfg(loginHandle,ctrl_smart_status,body.c_str(),body.length());
+    return 0;
+}
+
+/*
+open fast odom receive
+param:
+    recv_switch : 
+    OFF = 0, close fast odom receive
+    ON = 1, open fast odom receive
+*/
+int baton_open_fast_odom_recv(recv_switch sw){
+    if(sw == ON)
+        std::cout << "fast odom receive open" << std::endl;
+    else
+        std::cout << "fast odom receive close" << std::endl;
+
+    std::string body = "";
+	cJSON* obj = cJSON_CreateObject();
+	if (obj) {
+		cJSON_AddNumberToObject(obj, "odom", (int)sw);
 		char* out = cJSON_PrintUnformatted(obj);
 		body.append(out);
 		free(out);

@@ -88,6 +88,7 @@ typedef struct{
 	int tof_deep_image_enable;
 	int tof_amp_image_enable;
 	int light;
+	int odom;
 }vio_smart_cfg_s;
 
 //锟斤拷锟斤拷时锟斤拷OSD

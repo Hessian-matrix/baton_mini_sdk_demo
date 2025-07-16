@@ -32,7 +32,7 @@ typedef enum {
 typedef enum{
     OFF = 0,
     ON = 1,
-}imu_switch;
+}recv_switch;
 
 typedef struct{
     double fx,fy,cx,cy;
@@ -55,7 +55,8 @@ bool alog_start();
 bool algo_stop();
 bool algo_restart();
 int baton_client_ipaddress(const char* ip_addr);
-int baton_open_imu_recv(imu_switch sw);
+int baton_open_imu_recv(recv_switch sw);
+int baton_open_fast_odom_recv(recv_switch sw);
 int baton_open_image_recv(image_get image_type_get);
 void get_device_version();
 void get_device_param();

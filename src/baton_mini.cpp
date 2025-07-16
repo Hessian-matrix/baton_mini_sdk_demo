@@ -21,7 +21,7 @@ vio_login_info_s login_info = {
 };
 
 std::string server_ip = "192.168.1.10";//device ip address as server
-std::string local_ip = "192.168.1.15";//local ip address as client
+std::string local_ip = "192.168.1.16";//local ip address as client
 
 //connect_callback get status for connect
 void vio_call connect_callback(int state, void* userData){
@@ -101,9 +101,9 @@ void command_thread(){
     get_device_version();
     get_device_param();
     // set_network("192.168.1.10");
-    cout << "Please input the operation[0-4] : ";   
+    cout << "Please input the operation[0-5] : ";   
 
-    imu_switch imu_status = OFF;
+    recv_switch imu_status = OFF,odom_status = OFF;
     int v;
     while (cin >> v){
         if (v == 0) {//logout connect
@@ -136,12 +136,24 @@ void command_thread(){
         else if(v == 4){//Select to receive image data 
             baton_open_image_recv(stereo);
         }
+        else if(v == 5){//Select to receive image data 
+            if(odom_status == ON){
+                odom_status = OFF;
+			    baton_open_fast_odom_recv(odom_status);
+            }
+            else{
+                odom_status = ON;
+                baton_open_fast_odom_recv(odom_status);
+            }
+        }
     }
     net_vio_sdk_exit();
     cout << "ByeBye\n";
 }
 
 void imu_data_recv(const imu_data& imu){}
+
+void fast_odom_data_recv(const odom_pack& imu){}
 
 void image_left_data(const cv::Mat& image_){}
 
@@ -155,6 +167,7 @@ int main(int argc, char** argv){
 
     std::thread http_command{command_thread};
     IMU imu_recv(&publish_imu);
+    Fast_odom odom_recv(&publish_fast_odom);
     Image_tcp image_left_recv(&publish_image_left);//left default
     Image_tcp image_right_recv(&publish_image_right,false);//right must set false
 
@@ -164,6 +177,7 @@ int main(int argc, char** argv){
     #else
     std::thread http_command{command_thread};
     IMU imu_recv(&imu_data_recv);
+    Fast_odom odom_recv(&fast_odom_data_recv);
     Image_tcp image_left_recv(&image_left_data);//left default
     Image_tcp image_right_recv(&image_right_data,false);//right must set false
     #endif

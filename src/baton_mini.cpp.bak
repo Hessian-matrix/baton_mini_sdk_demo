@@ -22,7 +22,7 @@ ros::Publisher pub_image_feature;
 
 HANDLE loginHandle; 
 system_status sys_status = ready;//define the status of system
-imu_switch imu_status = OFF;
+recv_switch imu_status = OFF;
 
 void vio_call connect_callback(int state, void* userData){
     if (state == 1)
@@ -98,7 +98,7 @@ void vio_call stream_callback(int channel, const vio_frame_info_s* frameInfo, co
     // printf("==================\n");
 }
 
-int baton_open_imu_recv(HANDLE loginHandle,imu_switch sw){
+int baton_open_imu_recv(HANDLE loginHandle,recv_switch sw){
     std::string body = "";
 	cJSON* obj = cJSON_CreateObject();
 	if (obj) {

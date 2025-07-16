@@ -1,6 +1,6 @@
 <launch>
     <node name="baton_mini" pkg="baton_mini" type="baton_mini" output="screen">
         <param name="server_ip" value="192.168.1.10"/>
-        <param name="local_ip" value="192.168.1.11"/>
+        <param name="local_ip" value="192.168.1.18"/>
     </node>
 </launch>
