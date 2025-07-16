@@ -19,7 +19,7 @@ baton_mini.launch文件配置设备IP和电脑本地IP，非ROS版本需要自�
 //154~160行
 void imu_data_recv(const imu_data& imu){}
 
-void fast_odom_data_recv(const odom_pack& imu){}
+void fast_odom_data_recv(const odom_pack& odom){}
 
 void image_left_data(const cv::Mat& image_){}
 

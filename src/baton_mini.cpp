@@ -153,7 +153,7 @@ void command_thread(){
 
 void imu_data_recv(const imu_data& imu){}
 
-void fast_odom_data_recv(const odom_pack& imu){}
+void fast_odom_data_recv(const odom_pack& odom){}
 
 void image_left_data(const cv::Mat& image_){}
 
