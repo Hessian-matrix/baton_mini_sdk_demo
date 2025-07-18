@@ -136,7 +136,7 @@ void command_thread(){
         else if(v == 4){//Select to receive image data 
             baton_open_image_recv(stereo);
         }
-        else if(v == 5){//Select to receive image data 
+        else if(v == 5){//Select to receive fast odometry data
             if(odom_status == ON){
                 odom_status = OFF;
 			    baton_open_fast_odom_recv(odom_status);
@@ -153,7 +153,7 @@ void command_thread(){
 
 void imu_data_recv(const imu_data& imu){}
 
-void fast_odom_data_recv(const odom_pack& imu){}
+void fast_odom_data_recv(const odom_pack& odom){}
 
 void image_left_data(const cv::Mat& image_){}
 
